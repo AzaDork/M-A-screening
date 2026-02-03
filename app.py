@@ -112,38 +112,58 @@ if "client_description" not in st.session_state:
 if st.button("Generate client description"):
     if not api_key:
         st.error("Add your OpenAI API key to generate a description.")
+    elif not any([client_homepage, client_aboutuspage, client_productpage, client_solutionpage]):
+        st.error("Provide at least one client URL to extract content.")
     else:
         try:
-            client = make_client(api_key)
-            with WebExtractor(
-                mode=scrape_mode,
-                browser_executable_path=chrome_path,
-                cache_path=cache_path or None,
-                max_workers=int(max_workers),
-            ) as extractor:
-                homepage_text = extractor.extract_text(client_homepage)
-                about_text = extractor.extract_text(client_aboutuspage)
-                products_text = extractor.extract_text(client_productpage)
-                solutions_text = extractor.extract_text(client_solutionpage)
+            with st.spinner("Generating client description..."):
+                client = make_client(api_key)
+                with WebExtractor(
+                    mode=scrape_mode,
+                    browser_executable_path=chrome_path,
+                    cache_path=cache_path or None,
+                    max_workers=int(max_workers),
+                ) as extractor:
+                    homepage_text = extractor.extract_text(client_homepage)
+                    about_text = extractor.extract_text(client_aboutuspage)
+                    products_text = extractor.extract_text(client_productpage)
+                    solutions_text = extractor.extract_text(client_solutionpage)
 
-                all_texts = [
-                    ("About Us", about_text),
-                    ("Solutions", solutions_text),
-                    ("Products", products_text),
-                    ("Homepage", homepage_text),
-                ]
+                    all_texts = [
+                        ("About Us", about_text),
+                        ("Solutions", solutions_text),
+                        ("Products", products_text),
+                        ("Homepage", homepage_text),
+                    ]
 
-                description = generate_full_description(
-                    client,
-                    model,
-                    company_name=client_companyname,
-                    all_texts=all_texts,
-                    commentary="",
-                    headquarter="",
-                    keywords="",
-                    employee="",
-                )
-                st.session_state["client_description"] = description or ""
+                    text_lengths = {
+                        "Homepage": len(homepage_text or ""),
+                        "About": len(about_text or ""),
+                        "Products": len(products_text or ""),
+                        "Solutions": len(solutions_text or ""),
+                    }
+                    total_chars = sum(text_lengths.values())
+
+                    if total_chars == 0:
+                        st.error("No text extracted from the client URLs. Check the URLs or switch to Selenium mode.")
+                        with st.expander("Extraction details"):
+                            st.write(text_lengths)
+                    else:
+                        description = generate_full_description(
+                            client,
+                            model,
+                            company_name=client_companyname,
+                            all_texts=all_texts,
+                            commentary="",
+                            headquarter="",
+                            keywords="",
+                            employee="",
+                        )
+                        if description:
+                            st.session_state["client_description"] = description
+                            st.success("Client description generated.")
+                        else:
+                            st.error("The model returned an empty description. Try again or verify the URLs.")
         except Exception as exc:
             st.error(f"Failed to generate client description: {exc}")
 
