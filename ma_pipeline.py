@@ -689,14 +689,16 @@ def run_scoring(
 
     for idx in range(start_index, total_rows):
         company = _safe_str(df.at[idx, company_col])
-        homepage = _safe_str(df.at[idx, homepage_col])
+        homepage = _normalize_url(_safe_str(df.at[idx, homepage_col]))
         if progress_cb:
             progress_cb(idx - start_index + 1, total_rows - start_index, company)
 
-        if not homepage.startswith("http"):
+        if not homepage:
             if log_cb:
                 log_cb(f"Skipping: missing or invalid homepage for {company}")
             continue
+
+        df.at[idx, homepage_col] = homepage
 
         if detect_subpages:
             found_links = find_sector_pages_with_gpt(client, model, extractor, homepage, sector)
@@ -719,6 +721,15 @@ def run_scoring(
         about_text = texts.get(_normalize_url(about_url), "")
         solutions_text = texts.get(_normalize_url(solutions_url), "")
         products_text = texts.get(_normalize_url(products_url), "")
+
+        text_lengths = {
+            "homepage": len(homepage_text or ""),
+            "about": len(about_text or ""),
+            "solutions": len(solutions_text or ""),
+            "products": len(products_text or ""),
+        }
+        if log_cb and sum(text_lengths.values()) == 0:
+            log_cb(f"No text extracted for {company}. Check URLs or try a different scraping mode.")
 
         all_texts = [
             ("About Us", about_text),
