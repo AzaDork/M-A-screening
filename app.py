@@ -56,6 +56,7 @@ with st.sidebar:
     chrome_path = st.text_input("Chrome path (selenium only)", value="")
     cache_path = st.text_input("Cache file (optional)", value="ma_cache.db")
     max_workers = st.number_input("Parallel fetch workers", min_value=1, max_value=12, value=4)
+    use_jina_fallback = st.checkbox("Use Jina AI fallback (external)", value=False)
 
     delay_seconds = st.number_input("Delay between targets (sec)", min_value=0.0, value=3.0, step=0.5)
     score_threshold = st.number_input("Score threshold for enrichment", min_value=0, max_value=5, value=3)
@@ -123,6 +124,7 @@ if st.button("Generate client description"):
                     browser_executable_path=chrome_path,
                     cache_path=cache_path or None,
                     max_workers=int(max_workers),
+                    use_jina_fallback=use_jina_fallback,
                 ) as extractor:
                     homepage_text = extractor.extract_text(client_homepage)
                     about_text = extractor.extract_text(client_aboutuspage)
@@ -244,6 +246,7 @@ if df is not None:
                         browser_executable_path=chrome_path,
                         cache_path=cache_path or None,
                         max_workers=int(max_workers),
+                        use_jina_fallback=use_jina_fallback,
                     ) as extractor:
                         df = run_scoring(
                             df,
@@ -323,6 +326,7 @@ if df is not None:
                 browser_executable_path=chrome_path,
                 cache_path=cache_path or None,
                 max_workers=int(max_workers),
+                use_jina_fallback=use_jina_fallback,
             ) as extractor:
                 df = tag_categories(
                     df,
@@ -381,6 +385,7 @@ if df is not None:
                 browser_executable_path=chrome_path,
                 cache_path=cache_path or None,
                 max_workers=int(max_workers),
+                use_jina_fallback=use_jina_fallback,
             ) as extractor:
                 df = tag_end_markets(
                     df,

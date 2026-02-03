@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 MIN_TEXT_LENGTH = 200
+JINA_TEXT_BASE = "https://r.jina.ai/http://"
 
 
 def _safe_str(value):
@@ -77,6 +78,21 @@ def _extract_with_trafilatura(html):
         return None
 
 
+def _fetch_with_jina(url):
+    try:
+        if url.startswith("https://"):
+            jina_url = JINA_TEXT_BASE + url[len("https://") :]
+        elif url.startswith("http://"):
+            jina_url = JINA_TEXT_BASE + url[len("http://") :]
+        else:
+            jina_url = JINA_TEXT_BASE + url
+        response = requests.get(jina_url, timeout=20)
+        response.raise_for_status()
+        return response.text
+    except Exception:
+        return None
+
+
 class WebExtractor:
     def __init__(
         self,
@@ -86,12 +102,14 @@ class WebExtractor:
         page_wait_seconds=10,
         cache_path=None,
         max_workers=4,
+        use_jina_fallback=False,
     ):
         self.mode = mode
         self.headless = headless
         self.browser_executable_path = browser_executable_path
         self.page_wait_seconds = page_wait_seconds
         self.max_workers = max_workers
+        self.use_jina_fallback = use_jina_fallback
         self.driver: Any = None
         self._by: Any = None
         self._wait: Any = None
@@ -199,6 +217,13 @@ class WebExtractor:
                 tf_text = re.sub(r"\s+", " ", tf_text.strip())
                 if len(tf_text) > len(text):
                     text = tf_text
+
+        if len(text) < MIN_TEXT_LENGTH and self.use_jina_fallback:
+            jina_text = _fetch_with_jina(url)
+            if jina_text:
+                jina_text = re.sub(r"\s+", " ", jina_text.strip())
+                if len(jina_text) > len(text):
+                    text = jina_text
 
         if self._cache is not None and text:
             self._cache[cache_key] = text
