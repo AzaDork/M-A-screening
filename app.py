@@ -56,7 +56,7 @@ with st.sidebar:
     chrome_path = st.text_input("Chrome path (selenium only)", value="")
     cache_path = st.text_input("Cache file (optional)", value="ma_cache.db")
     max_workers = st.number_input("Parallel fetch workers", min_value=1, max_value=12, value=4)
-    use_jina_fallback = st.checkbox("Use Jina AI fallback (external)", value=False)
+    use_jina_fallback = st.checkbox("Use Jina AI fallback (external)", value=True)
 
     delay_seconds = st.number_input("Delay between targets (sec)", min_value=0.0, value=3.0, step=0.5)
     score_threshold = st.number_input("Score threshold for enrichment", min_value=0, max_value=5, value=3)
@@ -202,6 +202,27 @@ if df is not None:
     st.subheader("Upload preview")
     preview_rows = st.number_input("Rows to preview", min_value=1, max_value=200, value=10, step=1)
     st.dataframe(df.head(int(preview_rows)), use_container_width=True)
+
+    st.subheader("Extraction test")
+    default_test_url = ""
+    if "Homepage" in df.columns and len(df) > 0:
+        first_url = df["Homepage"].iloc[0]
+        default_test_url = "" if pd.isna(first_url) else str(first_url)
+    test_url = st.text_input("Test URL", value=default_test_url, key="test_url")
+    if st.button("Test extraction"):
+        if not test_url.strip():
+            st.error("Provide a URL to test.")
+        else:
+            with WebExtractor(
+                mode=scrape_mode,
+                browser_executable_path=chrome_path,
+                cache_path=cache_path or None,
+                max_workers=int(max_workers),
+                use_jina_fallback=use_jina_fallback,
+            ) as extractor:
+                extracted = extractor.extract_text(test_url)
+            st.write(f"Characters extracted: {len(extracted)}")
+            st.text_area("Extracted sample", value=extracted[:2000], height=200)
     colmap = {
         "company": "Company",
         "homepage": "Homepage",
