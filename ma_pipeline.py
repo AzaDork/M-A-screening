@@ -200,7 +200,15 @@ class WebExtractor:
         try:
             page_source = self._get_page_source(url)
         except Exception:
-            return ""
+            page_source = ""
+
+        if not page_source and self.use_jina_fallback:
+            jina_text = _fetch_with_jina(url)
+            if jina_text:
+                jina_text = re.sub(r"\s+", " ", jina_text.strip())
+                if self._cache is not None and jina_text:
+                    self._cache[cache_key] = jina_text
+                return jina_text
 
         if not page_source:
             return ""
