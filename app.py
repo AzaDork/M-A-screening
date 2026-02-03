@@ -158,6 +158,7 @@ if st.button("Generate client description"):
                             headquarter="",
                             keywords="",
                             employee="",
+                            raise_on_error=True,
                         )
                         if description:
                             st.session_state["client_description"] = description

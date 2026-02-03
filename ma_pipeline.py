@@ -273,7 +273,17 @@ def find_sector_pages_with_gpt(client, model, extractor, homepage_url, sector):
         return {"About Us": None, "Solutions": None, "Products": None, "status": "exception"}
 
 
-def generate_full_description(client, model, company_name, all_texts, commentary, headquarter, keywords, employee):
+def generate_full_description(
+    client,
+    model,
+    company_name,
+    all_texts,
+    commentary,
+    headquarter,
+    keywords,
+    employee,
+    raise_on_error=False,
+):
     combined_text = _combine_texts(all_texts, max_chars=6000)
     if not combined_text:
         return None
@@ -299,6 +309,8 @@ def generate_full_description(client, model, company_name, all_texts, commentary
     try:
         return _call_chat(client, model, prompt, temperature=0.2, max_tokens=500)
     except Exception:
+        if raise_on_error:
+            raise
         return None
 
 
