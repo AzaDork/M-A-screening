@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+MIN_TEXT_LENGTH = 200
 
 
 def _safe_str(value):
@@ -61,6 +62,19 @@ def _call_chat(client, model, prompt, temperature=0.2, max_tokens=200):
         max_tokens=max_tokens,
     )
     return response.choices[0].message.content.strip()
+
+
+def _extract_with_trafilatura(html):
+    try:
+        trafilatura = importlib.import_module("trafilatura")
+        return trafilatura.extract(
+            html,
+            include_comments=False,
+            include_tables=False,
+            favor_precision=True,
+        )
+    except Exception:
+        return None
 
 
 class WebExtractor:
@@ -143,9 +157,17 @@ class WebExtractor:
             return self.driver.page_source
 
         headers = {"User-Agent": DEFAULT_USER_AGENT}
-        response = self._session.get(url, headers=headers, timeout=20)
-        response.raise_for_status()
-        return response.text
+        try:
+            response = self._session.get(url, headers=headers, timeout=20)
+            response.raise_for_status()
+            return response.text
+        except Exception as exc:
+            if url.startswith("https://"):
+                fallback_url = "http://" + url[len("https://") :]
+                response = self._session.get(fallback_url, headers=headers, timeout=20)
+                response.raise_for_status()
+                return response.text
+            raise exc
 
     def extract_text(self, url):
         url = _normalize_url(url)
@@ -153,7 +175,9 @@ class WebExtractor:
             return ""
         cache_key = f"text::{url}"
         if self._cache is not None and cache_key in self._cache:
-            return self._cache[cache_key]
+            cached = self._cache[cache_key]
+            if cached:
+                return cached
 
         try:
             page_source = self._get_page_source(url)
@@ -168,7 +192,15 @@ class WebExtractor:
             tag.decompose()
         text = soup.get_text(separator=" ", strip=True)
         text = re.sub(r"\s+", " ", text)
-        if self._cache is not None:
+
+        if len(text) < MIN_TEXT_LENGTH:
+            tf_text = _extract_with_trafilatura(page_source)
+            if tf_text:
+                tf_text = re.sub(r"\s+", " ", tf_text.strip())
+                if len(tf_text) > len(text):
+                    text = tf_text
+
+        if self._cache is not None and text:
             self._cache[cache_key] = text
         return text
 
@@ -729,7 +761,11 @@ def run_scoring(
             "products": len(products_text or ""),
         }
         if log_cb and sum(text_lengths.values()) == 0:
-            log_cb(f"No text extracted for {company}. Check URLs or try a different scraping mode.")
+            log_cb(
+                "No text extracted for "
+                f"{company}. Homepage: {homepage_url or 'missing'}. "
+                "Check URLs or try a different scraping mode."
+            )
 
         all_texts = [
             ("About Us", about_text),
